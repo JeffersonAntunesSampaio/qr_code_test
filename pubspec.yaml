@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   flutter_barcode_scanner: ^2.0.0
   dio: ^4.0.4
+  chaleno: ^0.0.5
 
 dev_dependencies:
   flutter_test:

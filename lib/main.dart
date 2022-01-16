@@ -1,3 +1,4 @@
+import 'package:chaleno/chaleno.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 
@@ -32,17 +33,98 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String text = "";
+  String code = "";
 
   void getQRCode() async {
+    try {
+      code = await FlutterBarcodeScanner.scanBarcode(
+        "#F44336",
+        "Cancelar",
+        false,
+        ScanMode.QR,
+      );
 
-    String code = await FlutterBarcodeScanner.scanBarcode(
-      "#F44336",
-      "Cancelar",
-      false,
-      ScanMode.QR
-    );
-    setState(() => text = code != '-1' ? code : 'Não validado');
+      if (code != '-1') {
 
+        String dateNF = "";
+        String companyName = "";
+        String companyCnpj = "";
+        String valueNF = "";
+
+        var parser = await Chaleno().load(
+            code);
+
+        //PESCAR NOME DA EMPRESA
+        companyName = parser?.getElementById('u20').text!.trim() ?? "";
+
+        //PESCAR CPNJ
+        List<Result>? resultsText = parser?.getElementsByClassName('text');
+        for (var r in resultsText!) {
+          if (r.text!.contains("CNPJ:")) {
+            companyCnpj = r.text!
+                .replaceAll("\t", "")
+                .replaceAll("\n", "")
+                .trim()
+                .split(":")
+                .last
+                .trim();
+            break;
+          }
+        }
+
+        //PESCAR VALOR DA NOTA
+        List<Result>? results = parser?.getElementsByClassName('linhaShade');
+        for (var r in results!) {
+          if (r.text!.contains("Valor a pagar R\$:") ||
+              r.text!.contains("Valor a pagar")) {
+            valueNF = r.text!
+                .replaceAll("\t", "")
+                .replaceAll("\n", "")
+                .trim()
+                .split(":")
+                .last
+                .trim();
+            break;
+          }
+        }
+
+        //PESCAR DATA DA NOTA
+        List<Result>? resultsTag = parser?.getElementsByTagName('li');
+        for (var r in resultsTag!) {
+          if (r.text!.contains("Emissão:") || r.text!.contains("Emissao:")) {
+            r.text!.split("\n").map((t) {
+              if (t.trim().contains("Emissão:") ||
+                  t.trim().contains("Emissao:")) {
+                var tSplit = t.trim().split(":");
+                if (tSplit.length > 3) {
+                  dateNF = tSplit[3].trim().split(" ").first;
+                }
+              }
+            }).toList();
+
+            break;
+          }
+        }
+
+        text = """
+                $companyName \n
+                $companyCnpj \n
+                $dateNF \n
+                $valueNF \n
+                Link do Code: $code
+        """;
+
+      } else {
+        text = 'Não validado';
+      }
+    } catch (e) {
+      print(e);
+      text = """
+                Link do Code: $code
+        """;
+    }
+    setState(() {
+    });
   }
 
   @override

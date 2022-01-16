@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:chaleno/chaleno.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:qr_code_test/company_model.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,6 +39,85 @@ class _MyHomePageState extends State<MyHomePage> {
   String text = "";
   String code = "";
 
+  String dateNF = "";
+  String companyName = "";
+  String companyCnpj = "";
+  String valueNF = "";
+  Dio dio = Dio();
+
+  Future<String> getNfcSP() async {
+    try {
+      var parser = await Chaleno().load(code);
+
+      //PESCAR NOME DA EMPRESA
+      companyName = parser?.getElementById('u20').text!.trim() ?? "";
+
+      //PESCAR CPNJ
+      List<Result>? resultsText = parser?.getElementsByClassName('text');
+      for (var r in resultsText!) {
+        if (r.text!.contains("CNPJ:")) {
+          companyCnpj = r.text!
+              .replaceAll("\t", "")
+              .replaceAll("\n", "")
+              .trim()
+              .split(":")
+              .last
+              .trim();
+          break;
+        }
+      }
+
+      //PESCAR VALOR DA NOTA
+      List<Result>? results = parser?.getElementsByClassName('linhaShade');
+      for (var r in results!) {
+        if (r.text!.contains("Valor a pagar R\$:") ||
+            r.text!.contains("Valor a pagar")) {
+          valueNF = r.text!
+              .replaceAll("\t", "")
+              .replaceAll("\n", "")
+              .trim()
+              .split(":")
+              .last
+              .trim();
+          break;
+        }
+      }
+
+      //PESCAR DATA DA NOTA
+      List<Result>? resultsTag = parser?.getElementsByTagName('li');
+      for (var r in resultsTag!) {
+        if (r.text!.contains("Emissão:") || r.text!.contains("Emissao:")) {
+          r.text!.split("\n").map((t) {
+            if (t.trim().contains("Emissão:") ||
+                t.trim().contains("Emissao:")) {
+              var tSplit = t.trim().split(":");
+              if (tSplit.length > 3) {
+                dateNF = tSplit[3].trim().split(" ").first;
+              }
+            }
+          }).toList();
+
+          break;
+        }
+      }
+
+      text = """
+                $companyName \n
+                $companyCnpj \n
+                $dateNF \n
+                $valueNF \n
+                Link do Code: $code
+        """;
+
+      return "SUCESS";
+    } catch (e) {
+      text = """
+                Link do Code: $code
+        """;
+      return "ERROR: ${e.toString()}";
+    }
+  }
+
   void getQRCode() async {
     try {
       code = await FlutterBarcodeScanner.scanBarcode(
@@ -45,65 +128,34 @@ class _MyHomePageState extends State<MyHomePage> {
       );
 
       if (code != '-1') {
-
-        String dateNF = "";
-        String companyName = "";
-        String companyCnpj = "";
-        String valueNF = "";
-
-        var parser = await Chaleno().load(
-            code);
-
-        //PESCAR NOME DA EMPRESA
-        companyName = parser?.getElementById('u20').text!.trim() ?? "";
-
-        //PESCAR CPNJ
-        List<Result>? resultsText = parser?.getElementsByClassName('text');
-        for (var r in resultsText!) {
-          if (r.text!.contains("CNPJ:")) {
-            companyCnpj = r.text!
-                .replaceAll("\t", "")
-                .replaceAll("\n", "")
-                .trim()
-                .split(":")
-                .last
-                .trim();
-            break;
-          }
+        //Codigos com link
+        if (code.contains("http") || code.contains(".sp.gov")) {
+          await getNfcSP();
         }
 
-        //PESCAR VALOR DA NOTA
-        List<Result>? results = parser?.getElementsByClassName('linhaShade');
-        for (var r in results!) {
-          if (r.text!.contains("Valor a pagar R\$:") ||
-              r.text!.contains("Valor a pagar")) {
-            valueNF = r.text!
-                .replaceAll("\t", "")
-                .replaceAll("\n", "")
-                .trim()
-                .split(":")
-                .last
-                .trim();
-            break;
-          }
-        }
+        //Codigos com dados
+        var codeSplit = code.split("|");
 
-        //PESCAR DATA DA NOTA
-        List<Result>? resultsTag = parser?.getElementsByTagName('li');
-        for (var r in resultsTag!) {
-          if (r.text!.contains("Emissão:") || r.text!.contains("Emissao:")) {
-            r.text!.split("\n").map((t) {
-              if (t.trim().contains("Emissão:") ||
-                  t.trim().contains("Emissao:")) {
-                var tSplit = t.trim().split(":");
-                if (tSplit.length > 3) {
-                  dateNF = tSplit[3].trim().split(" ").first;
-                }
-              }
-            }).toList();
+        if (codeSplit.length > 2) {
+          //data
+          dateNF = codeSplit[1].substring(0, 7);
+          //valor
+          valueNF = codeSplit[2];
 
-            break;
-          }
+          //Verifica cnpj
+          String cnpj = codeSplit.first.length > 44
+              ? codeSplit.first
+                  .substring(codeSplit.first.length - 44)
+                  .substring(6, 20)
+              : codeSplit.first.substring(6, 20);
+
+          final response =
+              await dio.get('https://www.receitaws.com.br/v1/cnpj/$cnpj');
+          // CompanyModel? companyModel = CompanyModel.fromJson(jsonDecode(response.data));
+
+          companyName = response.data["nome"];
+          companyCnpj = response.data["cnpj"];
+
         }
 
         text = """
@@ -113,18 +165,23 @@ class _MyHomePageState extends State<MyHomePage> {
                 $valueNF \n
                 Link do Code: $code
         """;
-
       } else {
         text = 'Não validado';
       }
+
+      setState(() {
+        print(code);
+      });
     } catch (e) {
       print(e);
       text = """
                 Link do Code: $code
         """;
+
+      setState(() {
+        print(code);
+      });
     }
-    setState(() {
-    });
   }
 
   @override
@@ -140,7 +197,7 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text(
-              'You have pushed the button this many times:',
+              'Dados: \n\n',
             ),
             Text(
               text,

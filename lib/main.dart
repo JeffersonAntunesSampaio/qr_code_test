@@ -36,7 +36,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String text = "";
+  String textLabel = "";
   String code = "";
 
   String dateNF = "";
@@ -101,7 +101,7 @@ class _MyHomePageState extends State<MyHomePage> {
         }
       }
 
-      text = """
+      textLabel = """
                 $companyName \n
                 $companyCnpj \n
                 $dateNF \n
@@ -111,7 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
       return "SUCESS";
     } catch (e) {
-      text = """
+      textLabel = """
                 Link do Code: $code
         """;
       return "ERROR: ${e.toString()}";
@@ -131,57 +131,54 @@ class _MyHomePageState extends State<MyHomePage> {
         //Codigos com link
         if (code.contains("http") || code.contains(".sp.gov")) {
           await getNfcSP();
-        }
+        } else {
+          //Codigos com dados
+          var codeSplit = code.split("|");
 
-        //Codigos com dados
-        var codeSplit = code.split("|");
+          if (codeSplit.length > 2) {
+            //data
+            dateNF = codeSplit[1].substring(0, 8);
+            //valor
+            valueNF = codeSplit[2];
 
-        if (codeSplit.length > 2) {
-          //data
-          dateNF = codeSplit[1].substring(0, 7);
-          //valor
-          valueNF = codeSplit[2];
+            //Verifica cnpj
+            String cnpj = codeSplit.first.length > 44
+                ? codeSplit.first
+                .substring(codeSplit.first.length - 44)
+                .substring(6, 20)
+                : codeSplit.first.substring(6, 20);
 
-          //Verifica cnpj
-          String cnpj = codeSplit.first.length > 44
-              ? codeSplit.first
-                  .substring(codeSplit.first.length - 44)
-                  .substring(6, 20)
-              : codeSplit.first.substring(6, 20);
+            final response =
+            await dio.get('https://www.receitaws.com.br/v1/cnpj/$cnpj');
+            // CompanyModel? companyModel = CompanyModel.fromJson(jsonDecode(response.data));
 
-          final response =
-              await dio.get('https://www.receitaws.com.br/v1/cnpj/$cnpj');
-          // CompanyModel? companyModel = CompanyModel.fromJson(jsonDecode(response.data));
+            companyName = response.data["nome"];
+            companyCnpj = response.data["cnpj"];
 
-          companyName = response.data["nome"];
-          companyCnpj = response.data["cnpj"];
+          }
 
-        }
-
-        text = """
+          textLabel = """
                 $companyName \n
                 $companyCnpj \n
                 $dateNF \n
                 $valueNF \n
                 Link do Code: $code
         """;
+        }
       } else {
-        text = 'Não validado';
+        textLabel = 'Não validado';
       }
 
-      setState(() {
-        print(code);
-      });
+
     } catch (e) {
       print(e);
-      text = """
+      textLabel = """
                 Link do Code: $code
         """;
-
-      setState(() {
-        print(code);
-      });
     }
+
+    setState(() {
+    });
   }
 
   @override
@@ -197,10 +194,10 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text(
-              'Dados: \n\n',
+              'Dados:',
             ),
             Text(
-              text,
+              textLabel,
             ),
           ],
         ),

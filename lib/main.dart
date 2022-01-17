@@ -127,6 +127,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ScanMode.QR,
       );
 
+
       if (code != '-1') {
         //Codigos com link
         if (code.contains("http") || code.contains(".sp.gov")) {
@@ -148,12 +149,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 .substring(6, 20)
                 : codeSplit.first.substring(6, 20);
 
-            final response =
+            var response =
             await dio.get('https://www.receitaws.com.br/v1/cnpj/$cnpj');
             // CompanyModel? companyModel = CompanyModel.fromJson(jsonDecode(response.data));
 
             companyName = response.data["nome"];
             companyCnpj = response.data["cnpj"];
+
+            //status 429
 
           }
 

@@ -168,17 +168,20 @@ class _MyHomePageState extends State<MyHomePage> {
       } else {
         textLabel = 'Não validado';
       }
-
+      setState(() {
+      });
 
     } catch (e) {
       print(e);
       textLabel = """
                 Link do Code: $code
         """;
+
+      setState(() {
+      });
     }
 
-    setState(() {
-    });
+
   }
 
   @override
